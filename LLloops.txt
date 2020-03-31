@@ -1,0 +1,30 @@
+ #####################################################
+
+ Livermore Loops Benchmark vfpv4 32 Bit via C/C++ Tue Mar 31 01:04:58 2020
+
+ Reliability test   0 seconds each loop x 24 x 3
+
+ Part 1 of 3 start at Tue Mar 31 01:04:59 2020
+
+ Section 1 Test 15 pass     1 Non-standard result was       3.9460838432e+04 expected       3.9438166904e+04. The percent error was 0.000000e+00
+ ERRORS - maximum of 5 reported per loop
+ Section 1 Test 15 pass     2 Different result was       3.9316968991e+04 expected       3.9460838432e+04. Percent error was 3.659220e+01
+ Section 1 Test 15 pass     3 Different result was       3.9379321331e+04 expected       3.9460838432e+04. Percent error was 2.070048e+01
+ Section 1 Test 15 pass     4 Different result was       3.9422175031e+04 expected       3.9460838432e+04. Percent error was 9.807526e+00
+ Section 1 Test 15 pass     5 Different result was       3.9378274827e+04 expected       3.9460838432e+04. Percent error was 2.096679e+01
+ Section 1 Test 15 pass     6 Different result was       3.9279635087e+04 expected       3.9460838432e+04. Percent error was 4.613163e+01
+ Section 1 Test 15 pass     7 Different result was       3.9278144434e+04 expected       3.9460838432e+04. Percent error was 4.651289e+01
+ Section 1 Test 15 pass     8 Different result was       3.9367000977e+04 expected       3.9460838432e+04. Percent error was 2.383658e+01
+ Section 1 Test 15 pass     9 Different result was       3.9389185708e+04 expected       3.9460838432e+04. Percent error was 1.819096e+01
+ Section 1 Test 15 pass    10 Different result was       3.9322284687e+04 expected       3.9460838432e+04. Percent error was 3.523543e+01
+ Section 1 Test 15 pass    11 Different result was       3.9252961434e+04 expected       3.9460838432e+04. Percent error was 5.295830e+01
+ Section 1 Test 15 pass    12 Different result was       3.9308001449e+04 expected       3.9460838432e+04. Percent error was 3.888190e+01
+ Section 1 Test 15 pass    13 Different result was       3.9474220565e+04 expected       3.9460838432e+04. Percent error was 3.390094e+00
+ Section 1 Test 15 pass    14 Different result was       3.9375810710e+04 expected       3.9460838432e+04. Percent error was 2.159390e+01
+ Section 1 Test 15 pass    15 Different result was       3.9308714973e+04 expected       3.9460838432e+04. Percent error was 3.869968e+01
+ Section 1 Test 15 pass    16 Different result was       3.9295591070e+04 expected       3.9460838432e+04. Percent error was 4.205239e+01
+ Section 1 Test 15 pass    17 Different result was       3.9330097948e+04 expected       3.9460838432e+04. Percent error was 3.324184e+01
+ Section 1 Test 15 pass    18 Different result was       3.9219623839e+04 expected       3.9460838432e+04. Percent error was 6.150355e+01
+ Section 1 Test 15 pass    19 Different result was       3.9324016639e+04 expected       3.9460838432e+04. Percent error was 3.479344e+01
+ Section 1 Test 15 pass    20 Different result was       3.9353336185e+04 expected       3.9460838432e+04. Percent error was 2.731719e+01
+ Section 1 Test 15 pass    21 Different result was       3.9338742862e+04 expected       3.9460838432e+04. Percent error was 3.103698e+01

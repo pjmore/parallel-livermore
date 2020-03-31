@@ -1918,37 +1918,54 @@ void kernels()
     do
     {
     _n = n;
-    double outer_xnm;
-    #ifdef TEST_SERIAL
     scale = 5.0 / 3.0;
     xnm = 1.0 / 3.0;
     e6 = 1.03 / 3.07;
-    for(int i = _n -1; i > 0; i--){
+    long f_count,s_count;
+    f_count = s_count = 0;
+
+
+    double xnm_arr[101];
+
+
+
+    //Unroll first iteration of the loop so we can ignore e6
+    xnm_arr[_n-1] = xnm;
+    xnm = xnm*vsp[_n-1] + vstp[_n-1];
+    vxne[_n-1] = xnm;
+    ve3[_n-1] = xnm;
+    vxnd[_n-1] = e6;
+
+    for(int i = _n -2; i > 0; i--){
+        xnm_arr[i] = xnm;
         //l61 first half
-        e3 = xnm*vlr[i] + vlin[i];
-        xnei = vxne[i];
-        vxnd[i] = e6;
-        xnc = scale*e3;
+        xnc = scale*xnm*vlr[i] + scale*vlin[i];
         //l60
-        if ( xnm > xnc || xnei > xnc ){
-            e6 = xnm*vsp[i] + vstp[i];
-            vxne[i] = e6;
-            xnm = e6;
-            ve3[i] = e6;
-        }else{
-            //l61 second half
-            ve3[i] = e3;
-            e6 = e3 + e3 - xnm;
-            vxne[i] = 2*e3 - xnei;
-            xnm = e6;
+        if ( xnm > xnc || vxne[i] > xnc ){
+            xnm =     xnm*vsp[i] + vstp[i];
+        }else
+        //l61 second half
+        {
+            xnm = 2*(xnm*vlr[i] + vlin[i]) - xnm;
         }
     }
-    as1.Xtra[39] = xnm;
 
-      #endif  
-        
 
-        set_scalar_vars
+    #pragma omp parallel for private(i) firstprivate(_n,vxnd,xnm_arr,scale, vlr, vlin, ve3, vsp, vstp, vxne)
+    for(int i = _n -2; i > 0; i--){
+        //printf("%d\n",__LINE__);
+        vxnd[i] = xnm_arr[i];
+        xnc = scale*xnm_arr[i]*vlr[i] + scale*vlin[i];
+        if(xnm_arr[i] > xnc || vxne[i] > xnc){
+            ve3[i] = xnm_arr[i]*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
+            vxne[i] = xnm_arr[i+1]* xnm*vsp[i] + vstp[i];
+        }else{
+            ve3[i] = xnm_arr[i]*vlr[i] + vlin[i];
+            vxne[i] = 2*(xnm_arr[i+1]*vlr[i] + vlin[i]) - vxne[i];
+        }
+    }
+
+    as1.Xtra[39] = xnm;        
         endloop (17);
         refresh_vars
     }
@@ -2116,6 +2133,8 @@ void kernels()
         //    //stb5 = b5[k+kb5i] - stb5;
         //}
         //// Same thing but with the loop indexes reversed assume an attempt to obsuficate the recurrence relation
+        // As these loops were developed as compiler competence tests
+        // Since it's the same thing I don't parallelize it
         for ( i=1 ; i<=n ; i++ )
         {
             k = n - i;
