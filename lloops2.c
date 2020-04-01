@@ -1939,14 +1939,34 @@ void kernels()
     for(int i = _n -2; i > 0; i--){
         xnm_arr[i] = xnm;
         //l61 first half
+        e3 = xnm*vlr[i] + vlin[i];
+        xnei = vxne[i];
+        //___________________________________ Below is neccesary for mine above is for checsum variables
+
+        //vxnd[i] = xnm;
         xnc = scale*xnm*vlr[i] + scale*vlin[i];
+        
         //l60
+        // xnc = 1.6*xnm
+        // therefore xnm > xnc will always be false
         if ( xnm > xnc || vxne[i] > xnc ){
+            //printf("Took first rout on %d\n", i);
+            //ve3[i] = xnm*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
+            //______________________________________________-
+
             xnm =     xnm*vsp[i] + vstp[i];
+            //vxne[i] = xnm*vsp[i] + vstp[i];
+            
         }else
         //l61 second half
         {
+            
+            //ve3[i] = xnm*vlr[i] + vlin[i];
+
+
+            //_____________________________________
             xnm = 2*(xnm*vlr[i] + vlin[i]) - xnm;
+            //vxne[i] = 2*(xnm*vlr[i] + vlin[i])  - vxne[i];
         }
     }
 
@@ -1955,13 +1975,13 @@ void kernels()
     for(int i = _n -2; i > 0; i--){
         //printf("%d\n",__LINE__);
         vxnd[i] = xnm_arr[i];
-        xnc = scale*xnm_arr[i]*vlr[i] + scale*vlin[i];
+        xnc = scale*xnm_arr[i]*(vlr[i] + vlin[i]);
         if(xnm_arr[i] > xnc || vxne[i] > xnc){
-            ve3[i] = xnm_arr[i]*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
-            vxne[i] = xnm_arr[i+1]* xnm*vsp[i] + vstp[i];
+            ve3[i] = xnm_arr[i]*vsp[i]  + vstp[i];
+            vxne[i] = xnm_arr[i-1]*vsp[i] + vstp[i];
         }else{
             ve3[i] = xnm_arr[i]*vlr[i] + vlin[i];
-            vxne[i] = 2*(xnm_arr[i+1]*vlr[i] + vlin[i]) - vxne[i];
+            vxne[i] = 2*ve3[i] - vxne[i];
         }
     }
 
