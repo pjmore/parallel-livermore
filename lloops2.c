@@ -45,6 +45,19 @@ typedef int   Boolean;
 #define FALSE 0
 // ______________________ My functions and types for reductions and the like ___________________
 
+enum specExecState{
+    NotExecuting=0,
+    NonSpeculatively,
+    Speculativly,
+};
+
+typedef struct{
+    long depth;
+    long left;
+    long right;
+    double coeff;
+    double constant;
+} cond_rec_node;
 
 #define FP_ERROR_THRESHOLD 0.01 
 
@@ -1114,10 +1127,11 @@ void kernels()
             ipntp += ii;
             ii /= 2;
             i = ipntp;
-            #pragma omp parallel for private(k) firstprivate(ipnt, ipntp,v,x)
+            #pragma omp parallel for private(k) firstprivate(ipnt, ipntp,v,x,i,ii)
             for ( k=ipnt+1 ; k<ipntp ; k=k+2 )
              {                 
                 i = ipntp +1 + (k - ipnt - 1)/2;
+                #pragma omp critical
                 x[i] = x[k] - v[k]*x[k-1] - v[k+1]*x[k+1];
              }
          } while ( ii>0 );
@@ -1679,7 +1693,7 @@ void kernels()
         nz = n;
         ar = 0.053;
         br = 0.073;
-        #pragma omp parallel for
+        #pragma omp parallel for private(j,k) firstprivate(nz,ar,br,vh,vy,t,r,s,vf,vg)
         for ( j=1 ; j<ng ; j++ )
         {
             for ( k=1 ; k<nz ; k++ )
@@ -1921,73 +1935,175 @@ void kernels()
     scale = 5.0 / 3.0;
     xnm = 1.0 / 3.0;
     e6 = 1.03 / 3.07;
-    long f_count,s_count;
-    f_count = s_count = 0;
-
-
     double xnm_arr[101];
 
+    double coeff[101];
+    double constants[101];
 
 
-    //Unroll first iteration of the loop so we can ignore e6
+    //Unroll first iteration of the loop so we can ignore that for the first iteration vxnd gets a special value
     xnm_arr[_n-1] = xnm;
     xnm = xnm*vsp[_n-1] + vstp[_n-1];
     vxne[_n-1] = xnm;
-    ve3[_n-1] = xnm;
+    ve3[_n-1] = xnm*vsp[_n-1] + vstp[i];
     vxnd[_n-1] = e6;
 
-    for(int i = _n -2; i > 0; i--){
-        xnm_arr[i] = xnm;
-        //l61 first half
-        e3 = xnm*vlr[i] + vlin[i];
-        xnei = vxne[i];
-        //___________________________________ Below is neccesary for mine above is for checsum variables
+    #define PARALLEL
 
-        //vxnd[i] = xnm;
-        xnc = scale*xnm*vlr[i] + scale*vlin[i];
-        
-        //l60
-        // xnc = 1.6*xnm
-        // therefore xnm > xnc will always be false
-        if ( xnm > xnc || vxne[i] > xnc ){
-            //printf("Took first rout on %d\n", i);
-            //ve3[i] = xnm*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
-            //______________________________________________-
+    //#ifndef PARALLEL
+    //for(int i = _n -2; i > 0; i--){
+    //    xnm_arr[i] = xnm;
+    //    //l61 first half
+    //    xnc = scale*xnm*vlr[i] + scale*vlin[i];
+    //    //l60
+    //    if ( xnm > xnc || vxne[i] > xnc ){
+    //        xnm =     xnm*vsp[i] + vstp[i];
+    //    }else
+    //    //l61 second half
+    //    {
+    //        xnm = 2*(xnm*vlr[i] + vlin[i]) - xnm;
+    //    }
+    //}
+    //for(int i = _n -2; i > 0; i--){
+    //    //printf("%d\n",__LINE__);
+    //    vxnd[i] = xnm_arr[i];
+    //    xnc = scale*xnm_arr[i]*vlr[i] + scale*vlin[i];
+    //    if(xnm_arr[i] > xnc || vxne[i] > xnc){
+    //        ve3[i] = xnm_arr[i]*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
+    //        vxne[i] = xnm_arr[i+1]* xnm*vsp[i] + vstp[i];
+    //    }else{
+    //        ve3[i] = xnm_arr[i]*vlr[i] + vlin[i];
+    //        vxne[i] = 2*(xnm_arr[i+1]*vlr[i] + vlin[i]) - vxne[i];
+    //    }
+    //}
+//
+    //#endif
+    //memset(NULL, 0 ,1);
 
-            xnm =     xnm*vsp[i] + vstp[i];
-            //vxne[i] = xnm*vsp[i] + vstp[i];
-            
-        }else
-        //l61 second half
+   // #ifdef PARALLEL
+
+
+
+
+
+//Use the same algorithm as kernel 5 and kernel 17 with a twist. Instead of a first order linear recurrence relation this kernel is a first order conditional recurrence relation
+// Exploiting the fact that the algorithm heavily favors one of the conditionals we create a speculative execution for the conditoinal, assuming it will 
+// always take one route. If this assumption is correct we can compute the relation in parallel after a small serial section. If the assumption more of the relation is computed serially.
+//This has a worst order complexity the same as a single processor if we ignore thread overhead.  
+        int tid_incorrect_spec_eval = -1;
+        Boolean completedEvaluation = FALSE;
+        omp_lock_t specExec_tid_lock;
+        omp_init_lock(&specExec_tid_lock);
+        #pragma omp parallel firstprivate(xnm, e3,xnei, vsp, vstp, vlr, vlin, scale,_n) shared(tid_incorrect_spec_eval, completedEvaluation, specExec_tid_lock, xnm_arr, coeff, constants)
         {
-            
-            //ve3[i] = xnm*vlr[i] + vlin[i];
+            int num_threads = omp_get_num_threads();
+            int tid = omp_get_thread_num();
+            int even_jobs = (int)floor((_n-2) /num_threads);
+            int num_jobs = even_jobs;
+            int extra_jobs = (_n-2) %num_threads;
+            if(tid < extra_jobs){
+                num_jobs++;
+            }
+            int low_idx = even_jobs*tid + imin(tid, extra_jobs);
+            int high_idx = low_idx + num_jobs;
+            int non_spec_tid = num_threads - 1;
+            if(tid == non_spec_tid){
+                xnm_arr[high_idx]=xnm;
+            }
+            #pragma omp barrier
+            while(!completedEvaluation){
+                if(tid == non_spec_tid){
+                    xnm = xnm_arr[high_idx];
+                    for(int i = high_idx; i > low_idx; i--){
+                        xnm_arr[i] = xnm;
+                        e3 = xnm*vlr[i] + vlin[i];
+                        xnei = vxne[i];
+                        xnc = scale*xnm*vlr[i] + scale*vlin[i];        
+                        if ( xnm > xnc || vxne[i] > xnc ){
+                            xnm =     xnm*vsp[i] + vstp[i];            
+                        }else{
+                            xnm = xnm*(2*vlr[i] - 1) + 2*vlin[i];
+                        }
+                    }
+                    xnm_arr[low_idx] = xnm;
+                }else if(tid < non_spec_tid){
+                    
+                    int start_idx = high_idx;
+                    int end_idx = low_idx-1;
+                    coeff[start_idx] = 2*vlr[start_idx] - 1;
+                    constant[start_idx] = 2*vlin[start_idx];
+                    for(int i = start_idx-1; i > end_idx; i--){
+                        coeff[i] = (2*vlr[i]*coeff[i+1] + constant[i+1]) - coeff[i+1];
+                        constant[i] =  constant[i+1] + 2*vlin[i];
+                    }
 
+                }
+                #pragma omp barrier
+                #pragma omp single
+                {
+                    for(int curr_tid=non_spec_tid-1; curr_tid < 0; curr_tid--){
+                        int prev_low_idx = even_jobs*(curr_tid+1) + imin(curr_tid+1, extra_jobs);
+                        int spec_low_idx = even_jobs*curr_tid + imin(curr_tid,extra_jobs);
+                        xnm_arr[spec_low_idx] = xnm_arr[prev_low_idx]*coeff[spec_low_idx] + constant[spec_low_idx];
 
-            //_____________________________________
-            xnm = 2*(xnm*vlr[i] + vlin[i]) - xnm;
-            //vxne[i] = 2*(xnm*vlr[i] + vlin[i])  - vxne[i];
+                    }
+                }
+                #pragma omp barrier
+                xnm = xnm_arr[high_idx];
+                #pragma omp barrier
+                if(tid < non_spec_tid){
+                    int i_min = 10000000;
+                    for(int i = high_idx; i > low_idx && tid >= tid_incorrect_spec_eval; i--){
+                        if(i_min == 10000000){
+                        }
+                        i_min = i;
+                        xnm_arr[i] = xnm;
+                        xnc = scale*(xnm*vlr[i] + vlin[i]);        
+                        if ( xnm > xnc || vxne[i] > xnc ){
+                            if(tid > tid_incorrect_spec_eval){
+                                    omp_set_lock(&specExec_tid_lock);
+                                    if(tid > tid_incorrect_spec_eval){
+                                        tid_incorrect_spec_eval = tid;
+                                    }
+                                    omp_unset_lock(&specExec_tid_lock);
+                            }
+                            xnm = xnm*vsp[i] + vstp[i];
+                        }else
+                        {
+                            xnm = xnm*(2*vlr[i] - 1) + 2*vlin[i];
+                        }
+                    }
+                    xnm_arr[low_idx] = xnm;
+                }
+                #pragma omp barrier                
+                completedEvaluation = tid_incorrect_spec_eval == -1 || (non_spec_tid == 0);
+                non_spec_tid = imax(non_spec_tid -1, tid_incorrect_spec_eval-1);
+                tid_incorrect_spec_eval = -1;
+                #pragma omp barrier
+            }
+            #pragma omp barrier
         }
-    }
+        xnm = xnm_arr[0];
+
+
 
 
     #pragma omp parallel for private(i) firstprivate(_n,vxnd,xnm_arr,scale, vlr, vlin, ve3, vsp, vstp, vxne)
     for(int i = _n -2; i > 0; i--){
-        //printf("%d\n",__LINE__);
         vxnd[i] = xnm_arr[i];
-        xnc = scale*xnm_arr[i]*(vlr[i] + vlin[i]);
+        xnc = scale*xnm_arr[i]*vlr[i] + scale*vlin[i];
         if(xnm_arr[i] > xnc || vxne[i] > xnc){
-            ve3[i] = xnm_arr[i]*vsp[i]  + vstp[i];
-            vxne[i] = xnm_arr[i-1]*vsp[i] + vstp[i];
+            ve3[i] = xnm_arr[i]*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
+            vxne[i] = xnm_arr[i+1]* xnm*vsp[i] + vstp[i];
         }else{
             ve3[i] = xnm_arr[i]*vlr[i] + vlin[i];
-            vxne[i] = 2*ve3[i] - vxne[i];
+            vxne[i] = 2*(xnm_arr[i+1]*vlr[i] + vlin[i]) - vxne[i];
         }
     }
-
-    as1.Xtra[39] = xnm;        
-        endloop (17);
-        refresh_vars
+    
+    as1.Xtra[39] = xnm_arr[0];        
+    endloop (17);
+    refresh_vars
     }
     while (count < loop);
 
