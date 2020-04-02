@@ -1948,43 +1948,6 @@ void kernels()
     ve3[_n-1] = xnm*vsp[_n-1] + vstp[i];
     vxnd[_n-1] = e6;
 
-    #define PARALLEL
-
-    //#ifndef PARALLEL
-    //for(int i = _n -2; i > 0; i--){
-    //    xnm_arr[i] = xnm;
-    //    //l61 first half
-    //    xnc = scale*xnm*vlr[i] + scale*vlin[i];
-    //    //l60
-    //    if ( xnm > xnc || vxne[i] > xnc ){
-    //        xnm =     xnm*vsp[i] + vstp[i];
-    //    }else
-    //    //l61 second half
-    //    {
-    //        xnm = 2*(xnm*vlr[i] + vlin[i]) - xnm;
-    //    }
-    //}
-    //for(int i = _n -2; i > 0; i--){
-    //    //printf("%d\n",__LINE__);
-    //    vxnd[i] = xnm_arr[i];
-    //    xnc = scale*xnm_arr[i]*vlr[i] + scale*vlin[i];
-    //    if(xnm_arr[i] > xnc || vxne[i] > xnc){
-    //        ve3[i] = xnm_arr[i]*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
-    //        vxne[i] = xnm_arr[i+1]* xnm*vsp[i] + vstp[i];
-    //    }else{
-    //        ve3[i] = xnm_arr[i]*vlr[i] + vlin[i];
-    //        vxne[i] = 2*(xnm_arr[i+1]*vlr[i] + vlin[i]) - vxne[i];
-    //    }
-    //}
-//
-    //#endif
-    //memset(NULL, 0 ,1);
-
-   // #ifdef PARALLEL
-
-
-
-
 
 //Use the same algorithm as kernel 5 and kernel 17 with a twist. Instead of a first order linear recurrence relation this kernel is a first order conditional recurrence relation
 // Exploiting the fact that the algorithm heavily favors one of the conditionals we create a speculative execution for the conditoinal, assuming it will 
@@ -2081,27 +2044,21 @@ void kernels()
                 tid_incorrect_spec_eval = -1;
                 #pragma omp barrier
             }
-            #pragma omp barrier
+            #pragma omp for private(i) firstprivate(vxnd,xnm_arr, ve3)
+            for(int i = _n -2; i > 0; i--){
+                vxnd[i] = xnm_arr[i];
+                xnc = scale*xnm_arr[i]*vlr[i] + scale*vlin[i];
+                if(xnm_arr[i] > xnc || vxne[i] > xnc){
+                    ve3[i] = xnm_arr[i]*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
+                    vxne[i] = xnm_arr[i+1]* xnm*vsp[i] + vstp[i];
+                }else{
+                    ve3[i] = xnm_arr[i]*vlr[i] + vlin[i];
+                    vxne[i] = 2*(xnm_arr[i+1]*vlr[i] + vlin[i]) - vxne[i];
+                }
+            }
         }
-        xnm = xnm_arr[0];
-
-
-
-
-    #pragma omp parallel for private(i) firstprivate(_n,vxnd,xnm_arr,scale, vlr, vlin, ve3, vsp, vstp, vxne)
-    for(int i = _n -2; i > 0; i--){
-        vxnd[i] = xnm_arr[i];
-        xnc = scale*xnm_arr[i]*vlr[i] + scale*vlin[i];
-        if(xnm_arr[i] > xnc || vxne[i] > xnc){
-            ve3[i] = xnm_arr[i]*vsp[i]*vsp[i] + vstp[i]*vsp[i] + vstp[i];
-            vxne[i] = xnm_arr[i+1]* xnm*vsp[i] + vstp[i];
-        }else{
-            ve3[i] = xnm_arr[i]*vlr[i] + vlin[i];
-            vxne[i] = 2*(xnm_arr[i+1]*vlr[i] + vlin[i]) - vxne[i];
-        }
-    }
-    
-    as1.Xtra[39] = xnm_arr[0];        
+    xnm = xnm_arr[0];
+    as1.Xtra[39] = xnm;        
     endloop (17);
     refresh_vars
     }
